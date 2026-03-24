@@ -1,0 +1,16 @@
+title,description,creationDate,dueDate,priority,status
+Finish report,Complete final project report,2026-03-01,2026-03-25,High,Open
+Grocery shopping,Buy ingredients for dinner,2026-03-02,2026-03-23,Medium,Completed
+Workout,Leg day at the gym,2026-03-03,,Low,Open
+Study algorithms,Review sorting algorithms,2026-03-04,2026-03-28,High,In Progress
+Clean apartment,Vacuum and mop floors,2026-03-05,2026-03-24,Medium,Open
+Call mom,Catch up over phone,2026-03-06,,Low,Completed
+Fix bug #42,Resolve null pointer exception,2026-03-07,2026-03-22,High,In Progress
+Read book,Finish reading chapter 5,2026-03-08,,Low,Open
+Pay bills,Electricity and internet,2026-03-09,2026-03-26,High,Open
+Team meeting,Weekly sync with team,2026-03-10,2026-03-21,Medium,Completed
+Plan trip,Research destinations and budget,2026-03-11,,Medium,Open
+Write blog post,Post about Java comparators,2026-03-12,2026-03-30,Low,In Progress
+Laundry,Wash and fold clothes,2026-03-13,2026-03-23,Low,Completed
+Prepare presentation,Slides for Monday meeting,2026-03-14,2026-03-27,High,Open
+Backup files,Save important documents to cloud,2026-03-15,,Medium,Open
