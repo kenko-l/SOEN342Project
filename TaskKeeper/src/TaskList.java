@@ -13,6 +13,11 @@ public class TaskList {
 		this.tasks.add(newTask);
 	}
 	
+	public void createSubtask(Task parentTask, String title, String description, LocalDate dueDate, Priority priority) {
+		Task newTask = new Task(parentTask, title, description, dueDate, priority);
+		this.tasks.add(newTask);
+	}
+	
 	public void createImportedTask(String taskName, String taskDescription, LocalDate taskCreationDate, LocalDate taskDueDate, Priority taskPriority, TaskStatus taskStatus, Task parentTask, ArrayList<Tag> tags) {
 		Task newTask = new Task(taskName, taskDescription, taskDueDate, taskPriority);
 		newTask.setCreationDate(taskCreationDate);

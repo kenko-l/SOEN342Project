@@ -1,5 +1,5 @@
 
 public class Collaborator {
 	private String name;
-	private String category;
+	private CollaboratorCategory category;
 }

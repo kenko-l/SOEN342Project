@@ -11,6 +11,7 @@ public class Task {
 	private Task parentTask;
 	private ArrayList<Tag> tags;
 	private Project project;
+	private Collaborator collaborator;
 	
 	public Task(String title, String description, LocalDate dueDate, Priority priority) {
 		this.title = title;
@@ -21,6 +22,21 @@ public class Task {
 		this.status = TaskStatus.OPEN;
 		this.project = null;
 		this.tags = new ArrayList<Tag>();
+		this.parentTask = null;
+		this.collaborator = null;
+	}
+	
+	public Task(Task parentTask, String title, String description, LocalDate dueDate, Priority priority) {
+		this.title = title;
+		this.description = description;
+		this.creationDate = LocalDate.now();
+		this.dueDate = dueDate;
+		this.priority = priority;
+		this.status = TaskStatus.OPEN;
+		this.project = parentTask.getProject();
+		this.tags = new ArrayList<Tag>();
+		this.parentTask = parentTask;
+		this.collaborator = null;
 	}
 	
 	
@@ -149,5 +165,14 @@ public class Task {
 	public void setProject(Project project) {
 		this.project = project;
 	}
+
+	public Collaborator getCollaborator() {
+		return collaborator;
+	}
+
+	public void setCollaborator(Collaborator collaborator) {
+		this.collaborator = collaborator;
+	}
+	
 	
 }

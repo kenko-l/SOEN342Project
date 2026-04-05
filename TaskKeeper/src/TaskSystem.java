@@ -47,6 +47,31 @@ public class TaskSystem {
 		taskList.createTask(taskName, taskDescription, formattedDueDate, formattedTaskPriority);
 	}
 	
+	public void createSubtask(Task parentTask, String taskName, String taskDescription, String taskPriority, String taskDueDate) {
+		if (getTaskByName(taskName) != null) {
+			System.out.println("Could not create task '" + taskName + "': Task name already in use");
+			return;
+		}
+		
+		Priority formattedTaskPriority = null;
+		switch(taskPriority) {
+		case "1":
+			formattedTaskPriority = Priority.LOW;
+			break;
+		case "2":
+			formattedTaskPriority = Priority.MEDIUM;
+			break;
+		case "3":
+			formattedTaskPriority = Priority.HIGH;
+			break;
+		}
+		
+		LocalDate formattedDueDate = null;
+		if (!taskDueDate.equals("")) formattedDueDate = LocalDate.parse(taskDueDate);
+		
+		taskList.createSubtask(parentTask, taskName, taskDescription, formattedDueDate, formattedTaskPriority);
+	}
+	
 	public void createImportedTask(String taskName, String taskDescription, String taskCreationDate, String taskDueDate, String taskPriority, String taskStatus, String parentTask, ArrayList<Tag> tags) {
 		if (getTaskByName(taskName) != null) {
 			System.out.println("Could not import task '" + taskName + "': Task name already in use");
@@ -204,6 +229,15 @@ public class TaskSystem {
 			if (task.getTitle().equalsIgnoreCase(taskName)) return task;
 		}
 		return null;
+	}
+	
+	public ArrayList<Task> getSubtasks(Task task){
+		ArrayList<Task> output = new ArrayList<Task>();
+		for (Task targetTask : taskList.getTasks()) {
+			if (targetTask.getParentTask() == null) continue;
+			if (targetTask.getParentTask().getTitle().equalsIgnoreCase(task.getTitle())) output.add(targetTask);
+		}
+		return output;
 	}
 	
 	public void createActivityEntry(Task task, String description) {

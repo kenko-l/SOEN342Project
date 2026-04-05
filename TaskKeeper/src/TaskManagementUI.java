@@ -83,6 +83,38 @@ public class TaskManagementUI {
 	}
 	
 	private static void handleTaskCreation() {
+		String taskType;
+		Task parentTask = null;
+		
+		while(true) {
+			System.out.println("1. Create task");
+			System.out.println("2. Create subtask");
+			System.out.println("Choose an option:");
+			taskType = sc.nextLine().trim();
+			if (taskType.equals("1") || taskType.equals("2")) break;
+			else System.out.println("Invalid selection");
+		}
+		
+		if (taskType.equals("2")) {
+			ArrayList<Task> tasks = taskSystem.getTasks("None", "", "Due date", "Ascending");
+			if (tasks.size() == 0) {
+				System.out.println("There are no tasks available to assign as parent task");
+				return;
+			}
+			
+			while(true) {
+				System.out.println("Available parent tasks:");
+				for (int i = 0; i < tasks.size(); i++) {
+					System.out.println((i + 1) + ". " + tasks.get(i).getTitle());
+				}
+				System.out.println("Enter parent task name: ");
+				String parentTaskName = sc.nextLine().trim();
+				parentTask = taskSystem.getTaskByName(parentTaskName);
+				if (parentTask != null) break;
+				else System.out.println("Task does not exist");
+			}
+		}
+		
 		String taskName;
 		String taskDescription;
 		String taskPriority;
@@ -116,10 +148,19 @@ public class TaskManagementUI {
 				System.out.println("Invalid date format");
 			}
 		}
-		taskSystem.createTask(taskName, taskDescription, taskPriority, taskDueDate);
-		Task createdTask = taskSystem.getTaskByName(taskName);
-		taskSystem.createActivityEntry(createdTask, "Task created");
-		System.out.println("Task created successfully!");
+		
+		if (taskType.equals("1")) {
+			taskSystem.createTask(taskName, taskDescription, taskPriority, taskDueDate);
+			Task createdTask = taskSystem.getTaskByName(taskName);
+			taskSystem.createActivityEntry(createdTask, "Task created");
+			System.out.println("Task created successfully!");
+		}
+		else {
+			taskSystem.createSubtask(parentTask, taskName, taskDescription, taskPriority, taskDueDate);
+			Task createdTask = taskSystem.getTaskByName(taskName);
+			taskSystem.createActivityEntry(createdTask, "Subtask created");
+			System.out.println("Subtask created successfully!");
+		}
 	}
 	
 	private static void handleTaskUpdate() {
@@ -227,6 +268,17 @@ public class TaskManagementUI {
 				break;
 				
 			case "6":
+				if (targetTask.getParentTask() != null) {
+					System.out.println("Cannot change the project of a subtask");
+					break;
+				}
+				ArrayList<Task> subtasks = taskSystem.getSubtasks(targetTask);
+				for (Task subtask : subtasks) {
+					if (subtask.getCollaborator() != null && subtask.getStatus() == TaskStatus.OPEN) {
+						System.out.println("Cannot change project if task has an open collaborated subtask");
+						break;
+					}
+				}
 				ArrayList<Project> projects = taskSystem.getProjects();
 				String projectName;
 				if (targetTask.getProject() == null) System.out.println("Current project: none");
@@ -242,6 +294,10 @@ public class TaskManagementUI {
 					else System.out.println("Project does not exist");
 				}
 				taskSystem.updateTaskProject(targetTask, projectName);
+				for (Task subtask : subtasks) {
+					taskSystem.updateTaskProject(subtask, projectName);
+					taskSystem.createActivityEntry(subtask, "Project updated: " + projectName);
+				}
 				taskSystem.createActivityEntry(targetTask, "Project updated: " + projectName);
 				System.out.println("Project updated successfully!");
 				break;
