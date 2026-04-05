@@ -23,11 +23,6 @@ public class TaskSystem {
 	//-----------------------------------------------------------------------
 	
 	public void createTask(String taskName, String taskDescription, String taskPriority, String taskDueDate) {
-		if (getTaskByName(taskName) != null) {
-			System.out.println("Could not create task '" + taskName + "': Task name already in use");
-			return;
-		}
-		
 		Priority formattedTaskPriority = null;
 		switch(taskPriority) {
 		case "1":
@@ -48,11 +43,6 @@ public class TaskSystem {
 	}
 	
 	public void createSubtask(Task parentTask, String taskName, String taskDescription, String taskPriority, String taskDueDate) {
-		if (getTaskByName(taskName) != null) {
-			System.out.println("Could not create task '" + taskName + "': Task name already in use");
-			return;
-		}
-		
 		Priority formattedTaskPriority = null;
 		switch(taskPriority) {
 		case "1":
@@ -70,6 +60,26 @@ public class TaskSystem {
 		if (!taskDueDate.equals("")) formattedDueDate = LocalDate.parse(taskDueDate);
 		
 		taskList.createSubtask(parentTask, taskName, taskDescription, formattedDueDate, formattedTaskPriority);
+	}
+	
+	public void createCollaboratorTask(Collaborator collaborator, Task parentTask, String taskName, String taskDescription, String taskPriority, String taskDueDate) {
+		Priority formattedTaskPriority = null;
+		switch(taskPriority) {
+		case "1":
+			formattedTaskPriority = Priority.LOW;
+			break;
+		case "2":
+			formattedTaskPriority = Priority.MEDIUM;
+			break;
+		case "3":
+			formattedTaskPriority = Priority.HIGH;
+			break;
+		}
+		
+		LocalDate formattedDueDate = null;
+		if (!taskDueDate.equals("")) formattedDueDate = LocalDate.parse(taskDueDate);
+		
+		taskList.createCollaboratorTask(collaborator, parentTask, taskName, taskDescription, formattedDueDate, formattedTaskPriority);
 	}
 	
 	public void createImportedTask(String taskName, String taskDescription, String taskCreationDate, String taskDueDate, String taskPriority, String taskStatus, String parentTask, ArrayList<Tag> tags) {
@@ -231,11 +241,31 @@ public class TaskSystem {
 		return null;
 	}
 	
-	public ArrayList<Task> getSubtasks(Task task){
-		ArrayList<Task> output = new ArrayList<Task>();
-		for (Task targetTask : taskList.getTasks()) {
-			if (targetTask.getParentTask() == null) continue;
-			if (targetTask.getParentTask().getTitle().equalsIgnoreCase(task.getTitle())) output.add(targetTask);
+	public ArrayList<Subtask> getSubtasks(){
+		return taskList.getSubtasks();
+	}
+	
+	public ArrayList<CollaboratorTask> getCollaboratorTasks(){
+		return taskList.getCollaboratorTasks();
+	}
+	
+	public ArrayList<Subtask> getTaskSubtasks(Task task){
+		ArrayList<Subtask> output = new ArrayList<Subtask>();
+		ArrayList<Subtask> subtasks = getSubtasks();
+		for (Subtask subtask: subtasks) {
+			if (subtask.getParentTask().equals(task)) {
+				output.add(subtask);
+			}
+		}
+		return output;
+	}
+	
+	public ArrayList<CollaboratorTask> getTaskCollaboratorTasks(Task task){
+		ArrayList<CollaboratorTask> output = getCollaboratorTasks();
+		for (CollaboratorTask collaboratorTask: output) {
+			if (!collaboratorTask.getParentTask().equals(task)) {
+				output.remove(collaboratorTask);
+			}
 		}
 		return output;
 	}
@@ -305,6 +335,62 @@ public class TaskSystem {
 		task.setProject(project);
 	}
 	
+	public Collaborator getCollaboratorByName(Project project, String targetCollaborator) {
+		for (Collaborator collaborator : project.getCollaborators()) {
+			if (collaborator.getName().equalsIgnoreCase(targetCollaborator)) return collaborator;
+		}
+		return null;
+	}
+	
+	public void createCollaborator(String name, String category, Project project) {
+		Category formattedCategory = null;
+		switch(category) {
+		case "1":
+			formattedCategory = Category.JUNIOR;
+		case "2":
+			formattedCategory = Category.INTERMEDIATE;
+		case "3":
+			formattedCategory = Category.SENIOR;
+		}
+		project.addCollaborator(new Collaborator(name, formattedCategory));
+	}
+	
+	public boolean isAtCapacity(Project project, Collaborator collaborator) {
+		ArrayList<Task> openTasks = new ArrayList<Task>();
+		for (CollaboratorTask collaboratorTask : getCollaboratorTasks()) {
+			if (collaboratorTask.getCollaborator().equals(collaborator) &&
+				collaboratorTask.getStatus() == TaskStatus.OPEN) openTasks.add(collaboratorTask);
+		}
+		switch (collaborator.getCategory()) {
+		case JUNIOR:
+			return openTasks.size() > 9 ? true : false;
+		case INTERMEDIATE:
+			return openTasks.size() > 4 ? true : false;
+		case SENIOR:
+			return openTasks.size() > 1 ? true : false;
+		default:
+			return true;
+		}
+	}
+	
+	public boolean isOverloaded(Project project, Collaborator collaborator) {
+		ArrayList<Task> openTasks = new ArrayList<Task>();
+		for (CollaboratorTask collaboratorTask : getCollaboratorTasks()) {
+			if (collaboratorTask.getCollaborator().equals(collaborator) &&
+				collaboratorTask.getStatus() == TaskStatus.OPEN) openTasks.add(collaboratorTask);
+		}
+		switch (collaborator.getCategory()) {
+		case JUNIOR:
+			return openTasks.size() > 10 ? true : false;
+		case INTERMEDIATE:
+			return openTasks.size() > 5 ? true : false;
+		case SENIOR:
+			return openTasks.size() > 2 ? true : false;
+		default:
+			return true;
+		}
+	}
+	
 	//---------------------------------------------------------------
 	//Comparators
 	//---------------------------------------------------------------
@@ -355,102 +441,5 @@ public class TaskSystem {
 	//---------------------------------------------------
 	//Import/Export
 	//---------------------------------------------------
-	 public void exportToCSV(String fileName) throws IOException {
-	        try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileName))) {
-	            writer.write("title,description,creationDate,dueDate,priority,status");
-	            writer.newLine();
-
-	            for (Task task : taskList.getTasks()) {
-	                writer.write(task.getTitle());
-	                writer.write(",");
-	                writer.write(task.getDescription());
-	                writer.write(",");
-	                writer.write(task.getCreationDate().toString());
-	                writer.write(",");
-	                writer.write(task.getDueDate() == null ? "" : task.getDueDate().toString());
-	                writer.write(",");
-	                writer.write(task.getPriority().toString());
-	                writer.write(",");
-	                writer.write(task.getStatus().toString());
-	                writer.write(",");
-	                writer.write(task.getParentTask().getTitle());
-	                writer.write(",");
-	                String tagNames = task.getTags().stream().map(Tag::getTitle).collect(Collectors.joining("|"));
-	                writer.write(tagNames);
-	                writer.newLine();
-	            }
-	        }
-	        
-	        
-	    }
-	 	
-	 public void importFromCSV(String fileName) throws IOException {
-	        try (BufferedReader reader = Files.newBufferedReader(Paths.get(fileName))) {
-	            String line;
-	            boolean firstLine = true;
-
-	            while ((line = reader.readLine()) != null) {
-	                if (firstLine) {
-	                    firstLine = false;
-	                    continue; // skip header
-	                }
-
-	                List<String> fields = parseCSVLine(line);
-	                if (fields.size() < 6) {
-	                    continue;
-	                }
-
-	                String title = fields.get(0);
-	                String description = fields.get(1);
-	                String creationDate = fields.get(2);
-	                String dueDate = fields.get(3);
-	                String priority = fields.get(4);
-	                String status = fields.get(5);
-	                String parentTask = fields.get(6);
-	                String tagsField = fields.get(7);
-
-	                ArrayList<Tag> tags = new ArrayList<>();
-
-	                if (!tagsField.isEmpty()) {
-	                    String[] tagNames = tagsField.split("\\|");
-	                    for (String tagName : tagNames) {
-	                        tags.add(new Tag(tagName));
-	                    }
-	                }
-
-	                createImportedTask(title, description, creationDate, dueDate, priority, status, parentTask, tags);
-	            }
-	        }
-	        
-	        
-	    }
 	 
-	 private List<String> parseCSVLine(String line) {
-	        ArrayList<String> fields = new ArrayList<>();
-	        StringBuilder current = new StringBuilder();
-	        boolean inQuotes = false;
-
-	        for (int i = 0; i < line.length(); i++) {
-	            char c = line.charAt(i);
-
-	            if (c == '"') {
-	                if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
-	                    current.append('"');
-	                    i++;
-	                } else {
-	                    inQuotes = !inQuotes;
-	                }
-	            } else if (c == ',' && !inQuotes) {
-	                fields.add(current.toString());
-	                current.setLength(0);
-	            } else {
-	                current.append(c);
-	            }
-	        }
-
-	        fields.add(current.toString());
-	        return fields;
-	    }
-	
-	
 }

@@ -2,16 +2,14 @@ import java.time.*;
 import java.util.*;
 
 public class Task {
-	private String title;
-	private String description;
-	private LocalDate creationDate;
-	private LocalDate dueDate;
-	private Priority priority;
-	private TaskStatus status;
-	private Task parentTask;
-	private ArrayList<Tag> tags;
-	private Project project;
-	private Collaborator collaborator;
+	protected String title;
+	protected String description;
+	protected LocalDate creationDate;
+	protected LocalDate dueDate;
+	protected Priority priority;
+	protected TaskStatus status;
+	protected ArrayList<Tag> tags;
+	protected Project project;
 	
 	public Task(String title, String description, LocalDate dueDate, Priority priority) {
 		this.title = title;
@@ -22,34 +20,16 @@ public class Task {
 		this.status = TaskStatus.OPEN;
 		this.project = null;
 		this.tags = new ArrayList<Tag>();
-		this.parentTask = null;
-		this.collaborator = null;
-	}
-	
-	public Task(Task parentTask, String title, String description, LocalDate dueDate, Priority priority) {
-		this.title = title;
-		this.description = description;
-		this.creationDate = LocalDate.now();
-		this.dueDate = dueDate;
-		this.priority = priority;
-		this.status = TaskStatus.OPEN;
-		this.project = parentTask.getProject();
-		this.tags = new ArrayList<Tag>();
-		this.parentTask = parentTask;
-		this.collaborator = null;
 	}
 	
 	
 	@Override
-	public String toString() {
-		
+	public String toString() {		
 		String output =	("Title: " + this.title
 				+ "\nDescription: " + this.description
 				+ "\n\nCreated on: " + this.creationDate
 				);
-		if (project != null) output += ("\nProject: " + this.project.getName());
-		if (parentTask != null) output += ("\nParent Task: " + this.parentTask.getTitle());
-		
+		if (project != null) output += ("\nProject: " + this.project.getName());		
 		
 		if (dueDate != null) output += ("\nDue date: " + this.dueDate);
 		
@@ -142,14 +122,6 @@ public class Task {
 		}
 	}
 
-	public Task getParentTask() {
-		return parentTask;
-	}
-
-	public void setParentTask(Task parentTask) {
-		this.parentTask = parentTask;
-	}
-
 	public ArrayList<Tag> getTags() {
 		return tags;
 	}
@@ -164,14 +136,6 @@ public class Task {
 
 	public void setProject(Project project) {
 		this.project = project;
-	}
-
-	public Collaborator getCollaborator() {
-		return collaborator;
-	}
-
-	public void setCollaborator(Collaborator collaborator) {
-		this.collaborator = collaborator;
 	}
 	
 	

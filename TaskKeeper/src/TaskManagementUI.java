@@ -59,7 +59,7 @@ public class TaskManagementUI {
 			}
 			switch(UserInput) {
 			case "1":
-				handleTaskCreation();
+				handleTaskCreation("Task", null, null);
 				break;
 			case "2":
 				handleTaskUpdate();
@@ -82,39 +82,7 @@ public class TaskManagementUI {
 		}
 	}
 	
-	private static void handleTaskCreation() {
-		String taskType;
-		Task parentTask = null;
-		
-		while(true) {
-			System.out.println("1. Create task");
-			System.out.println("2. Create subtask");
-			System.out.println("Choose an option:");
-			taskType = sc.nextLine().trim();
-			if (taskType.equals("1") || taskType.equals("2")) break;
-			else System.out.println("Invalid selection");
-		}
-		
-		if (taskType.equals("2")) {
-			ArrayList<Task> tasks = taskSystem.getTasks("None", "", "Due date", "Ascending");
-			if (tasks.size() == 0) {
-				System.out.println("There are no tasks available to assign as parent task");
-				return;
-			}
-			
-			while(true) {
-				System.out.println("Available parent tasks:");
-				for (int i = 0; i < tasks.size(); i++) {
-					System.out.println((i + 1) + ". " + tasks.get(i).getTitle());
-				}
-				System.out.println("Enter parent task name: ");
-				String parentTaskName = sc.nextLine().trim();
-				parentTask = taskSystem.getTaskByName(parentTaskName);
-				if (parentTask != null) break;
-				else System.out.println("Task does not exist");
-			}
-		}
-		
+	private static void handleTaskCreation(String taskType, Task parentTask, Collaborator collaborator) {
 		String taskName;
 		String taskDescription;
 		String taskPriority;
@@ -149,17 +117,23 @@ public class TaskManagementUI {
 			}
 		}
 		
-		if (taskType.equals("1")) {
+		if (taskType.equals("Task")) {
 			taskSystem.createTask(taskName, taskDescription, taskPriority, taskDueDate);
 			Task createdTask = taskSystem.getTaskByName(taskName);
 			taskSystem.createActivityEntry(createdTask, "Task created");
 			System.out.println("Task created successfully!");
 		}
-		else {
+		else if (taskType.equals("Subtask")) {
 			taskSystem.createSubtask(parentTask, taskName, taskDescription, taskPriority, taskDueDate);
 			Task createdTask = taskSystem.getTaskByName(taskName);
 			taskSystem.createActivityEntry(createdTask, "Subtask created");
 			System.out.println("Subtask created successfully!");
+		}
+		else if (taskType.equals("CollaboratorTask")) {
+			taskSystem.createCollaboratorTask(collaborator, parentTask, taskName, taskDescription, taskPriority, taskDueDate);
+			Task createdTask = taskSystem.getTaskByName(taskName);
+			taskSystem.createActivityEntry(createdTask, "Collaborator task created");
+			System.out.println("Collaborator task created successfully!");
 		}
 	}
 	
@@ -172,7 +146,15 @@ public class TaskManagementUI {
 			return;
 		}
 		while(true) {
+			ArrayList<Subtask> subtasks = taskSystem.getTaskSubtasks(targetTask);
 			System.out.println(targetTask);
+			if (!subtasks.isEmpty()) {
+				System.out.println("\nSubtasks: ");
+				for (int i = 0; i<subtasks.size(); i++) {
+				System.out.println((i+1) + ": " + subtasks.get(i).getTitle());
+				}
+			}
+			System.out.println();
 			System.out.println("1. Change title");
 			System.out.println("2. Change description");
 			System.out.println("3. Change priority");
@@ -180,14 +162,17 @@ public class TaskManagementUI {
 			System.out.println("5. Change status");
 			System.out.println("6. Change project");
 			System.out.println("7. Change tags");
-			System.out.println("8. Go back");
+			System.out.println("8. Add subtask");
+			System.out.println("9. Assign Collaborator");
+			System.out.println("10. Go back");
 			
 			String UserInput;
 			while(true) {
 				System.out.print("Select an option:");
 				UserInput = sc.nextLine().trim();
 				if (UserInput.equals("1") || UserInput.equals("2") || UserInput.equals("3") || UserInput.equals("4") || 
-					UserInput.equals("5") || UserInput.equals("6") || UserInput.equals("7") || UserInput.equals("8")) break;
+					UserInput.equals("5") || UserInput.equals("6") || UserInput.equals("7") || UserInput.equals("8") ||
+					UserInput.equals("9") || UserInput.equals("10")) break;
 				System.out.println("Invalid selection");
 			}
 			
@@ -268,17 +253,22 @@ public class TaskManagementUI {
 				break;
 				
 			case "6":
-				if (targetTask.getParentTask() != null) {
+				if (targetTask instanceof Subtask) {
 					System.out.println("Cannot change the project of a subtask");
 					break;
 				}
-				ArrayList<Task> subtasks = taskSystem.getSubtasks(targetTask);
-				for (Task subtask : subtasks) {
-					if (subtask.getCollaborator() != null && subtask.getStatus() == TaskStatus.OPEN) {
+				ArrayList<CollaboratorTask> collaboratorTasks = taskSystem.getTaskCollaboratorTasks(targetTask);
+				
+				boolean nocollaborators = false;
+				for (CollaboratorTask collaboratorTask : collaboratorTasks) {
+					if (collaboratorTask.getStatus() == TaskStatus.OPEN) {
 						System.out.println("Cannot change project if task has an open collaborated subtask");
+						nocollaborators = true;
 						break;
 					}
 				}
+				if (nocollaborators) break;
+				
 				ArrayList<Project> projects = taskSystem.getProjects();
 				String projectName;
 				if (targetTask.getProject() == null) System.out.println("Current project: none");
@@ -394,6 +384,40 @@ public class TaskManagementUI {
 				}
 				break;				
 			case "8":
+				if (targetTask instanceof Subtask) {
+					System.out.println("Cannot create a subtask for a subtask");
+				}
+				handleTaskCreation("Subtask", targetTask, null);
+				break;
+			case "9":
+				if (targetTask instanceof Subtask) {
+					System.out.println("Cannot assign a collaborator for a subtask");
+					break;
+				}
+				if (targetTask.getProject() == null) {
+					System.out.println("Task must belong to a project to add a collaborator");
+					break;
+				}
+				ArrayList<Collaborator> collaborators = targetTask.getProject().getCollaborators();
+				if (collaborators.isEmpty()) {
+					System.out.println("Project has no listed collaborators");
+				}
+				for (Collaborator collaborator : collaborators) {
+					System.out.println(collaborator);
+					System.out.println();
+				}
+				String collaboratorName;
+				Collaborator collaborator;
+				while(true) {
+					System.out.print("Enter collaborator name: ");
+					collaboratorName = sc.nextLine().trim();
+					collaborator = taskSystem.getCollaboratorByName(targetTask.getProject(), collaboratorName);
+					if (collaborator != null) break;
+					else System.out.println("Collaborator does not exist");
+				}
+				handleTaskCreation("CollaboratorTask", targetTask, collaborator);
+				break;
+			case "10":
 				return;
 			}
 		}
@@ -431,13 +455,14 @@ public class TaskManagementUI {
 			System.out.println(targetProject);
 			System.out.println("1. Change title");
 			System.out.println("2. Change description");
-			System.out.println("3. Go back");
+			System.out.println("3. Add collaborator");
+			System.out.println("4. Go back");
 			
 			String UserInput;
 			while(true) {
 				System.out.print("Select an option:");
 				UserInput = sc.nextLine().trim();
-				if (UserInput.equals("1") || UserInput.equals("2") || UserInput.equals("3")) break;
+				if (UserInput.equals("1") || UserInput.equals("2") || UserInput.equals("3") || UserInput.equals("4")) break;
 				System.out.println("Invalid selection");
 			}
 			
@@ -468,6 +493,37 @@ public class TaskManagementUI {
 				break;
 				
 			case "3":
+				String collaboratorName;
+				String collaboratorCategory;
+				
+				while(true) {
+					System.out.print("Enter collaborator name: ");
+					collaboratorName = sc.nextLine().trim();
+					if (collaboratorName.equals("")) {
+						System.out.println("Collaborator name cannot be empty");
+					}
+					else if (taskSystem.getCollaboratorByName(targetProject, collaboratorName) == null) {
+						break;
+					}
+					else {
+						System.out.println("Collaborator name already exists!");
+					}
+				}
+				
+				while(true) {
+					System.out.println("1. Junior");
+					System.out.println("2. Intermediate");
+					System.out.println("3. Senior");
+					System.out.println("Choose category:");
+					collaboratorCategory = sc.nextLine().trim();
+					if (collaboratorCategory.equals("1") || collaboratorCategory.equals("2") || collaboratorCategory.equals("3")) break;
+					else System.out.println("Invalid selection");
+				}
+				
+				taskSystem.createCollaborator(collaboratorName, collaboratorCategory, targetProject);
+				System.out.println("Collaborator added successfully!");
+				break;
+			case "4":
 				return;
 			}
 		}
@@ -532,8 +588,15 @@ public class TaskManagementUI {
 			case "1":
 				ArrayList<Task> selectedTasks = taskSystem.getTasks(filterType, filterPackage, sortType, sortOrder);
 				for (Task task : selectedTasks) {
+					ArrayList<Subtask> subtasks = taskSystem.getTaskSubtasks(task);
 					System.out.println("/-----------------------------------------------/");
 					System.out.println(task);
+					if (!subtasks.isEmpty()) {
+						System.out.println("\nSubtasks: ");
+						for (int i = 0; i<subtasks.size(); i++) {
+						System.out.println((i+1) + ": " + subtasks.get(i).getTitle());
+						}
+					}
 					System.out.println("/-----------------------------------------------/");
 				}
 				break;
@@ -618,7 +681,7 @@ public class TaskManagementUI {
 						for (int i = 0; i<projects.size(); i++) {
 							System.out.println((i+1) + ": " + projects.get(i).getName());
 						}
-						System.out.println("Enter project name (Press enter to leave blank): ");
+						System.out.println("Enter project name: ");
 						String projectName = sc.nextLine().trim();
 						if (projectName.equals("")) break;
 						if (taskSystem.getProjectByName(projectName) != null) {
