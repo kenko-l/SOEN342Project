@@ -1,6 +1,5 @@
 import java.util.*;
 
-
 public class TagList {
 	private ArrayList<Tag> tagList;
 	
@@ -8,11 +7,12 @@ public class TagList {
 		this.tagList = new ArrayList<Tag>();
 	}
 	
-	public Tag get(String id) {
-		return null;
+	public ArrayList<Tag> getTags() {
+		return this.tagList;
 	}
 	
-	public void create(String title) {
-		
+	public void createTag(String title) {
+		Tag newTag = new Tag(title);
+		this.tagList.add(newTag);
 	}
 }

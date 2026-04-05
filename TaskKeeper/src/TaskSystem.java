@@ -1,66 +1,276 @@
 import java.io.*;
 import java.nio.file.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class TaskSystem {
 	private TaskList taskList;
 	private ProjectList projectList;
 	private TagList tagList;
+	private ActivityEntryList activityEntryList;
 	
 	public TaskSystem() {
 		this.taskList = new TaskList();
+		this.projectList = new ProjectList();
+		this.tagList = new TagList();
+		this.activityEntryList = new ActivityEntryList();
 	}
+	
+	//-----------------------------------------------------------------------
+	//Task functions
+	//-----------------------------------------------------------------------
 	
 	public void createTask(String taskName, String taskDescription, String taskPriority, String taskDueDate) {
-		taskList.createTask(taskName, taskDescription, taskPriority, taskDueDate);
+		if (getTaskByName(taskName) != null) {
+			System.out.println("Could not create task '" + taskName + "': Task name already in use");
+			return;
+		}
+		
+		Priority formattedTaskPriority = null;
+		switch(taskPriority) {
+		case "1":
+			formattedTaskPriority = Priority.LOW;
+			break;
+		case "2":
+			formattedTaskPriority = Priority.MEDIUM;
+			break;
+		case "3":
+			formattedTaskPriority = Priority.HIGH;
+			break;
+		}
+		
+		LocalDate formattedDueDate = null;
+		if (!taskDueDate.equals("")) formattedDueDate = LocalDate.parse(taskDueDate);
+		
+		taskList.createTask(taskName, taskDescription, formattedDueDate, formattedTaskPriority);
 	}
 	
-	public ArrayList<Task> getTasks(String sortMethod) {
-		ArrayList<Task> taskArray = this.taskList.getTasks();
-		if (sortMethod.equals("1")) {
-			taskArray.sort(byDueDate());
+	public void createImportedTask(String taskName, String taskDescription, String taskCreationDate, String taskDueDate, String taskPriority, String taskStatus, String parentTask, ArrayList<Tag> tags) {
+		if (getTaskByName(taskName) != null) {
+			System.out.println("Could not import task '" + taskName + "': Task name already in use");
+			return;
 		}
-		else if (sortMethod.equals("2")) {
-			taskArray.sort(byPriority());
+		
+		LocalDate formattedCreationDate = LocalDate.parse(taskCreationDate);
+		LocalDate formattedDueDate = LocalDate.parse(taskDueDate);
+		Priority formattedTaskPriority = null;
+		switch(taskPriority) {
+		case "LOW":
+			formattedTaskPriority = Priority.LOW;
+			break;
+		case "MEDIUM":
+			formattedTaskPriority = Priority.MEDIUM;
+			break;
+		case "HIGH":
+			formattedTaskPriority = Priority.HIGH;
+			break;
 		}
-		else if (sortMethod.equals("3")) {
-			taskArray.sort(byStatus());
+		TaskStatus formmatedStatus = null;
+		switch(taskStatus) {
+		case "OPEN":
+			formmatedStatus = TaskStatus.OPEN;
+			break;
+		case "COMPLETED":
+			formmatedStatus = TaskStatus.COMPLETED;
+			break;
+		case "CANCELED":
+			formmatedStatus = TaskStatus.CANCELLED;
+			break;
 		}
+		Task formattedParentTask = getTaskByName(parentTask);
+		
+		taskList.createImportedTask(taskName, taskDescription, formattedCreationDate, formattedDueDate, formattedTaskPriority, formmatedStatus, formattedParentTask, tags);
+	}
+	
+	public ArrayList<Task> getTasks(String filterType, String filterPackage, String sortType, String sortOrder) {
+		ArrayList<Task> taskArray = new ArrayList<Task>(this.taskList.getTasks());
+		
+		if (filterType.equals("Keyword")) {
+			for (int i = 0; i < taskArray.size(); i++) {
+				Task task = taskArray.get(i);
+				boolean inTitle = task.getTitle() != null && task.getTitle().toLowerCase().contains(filterPackage.toLowerCase());
+				boolean inDescription = task.getDescription() != null && task.getDescription().toLowerCase().contains(filterPackage.toLowerCase());
+				
+				if (!inTitle && !inDescription) {
+					taskArray.remove(i);
+					i--;
+				}
+			}
+		}
+		
+		else if (filterType.equals("Priority")) {
+			for (int i = 0; i < taskArray.size(); i++) {
+				if (!taskArray.get(i).getPriority().toString().equalsIgnoreCase(filterPackage)) {
+					taskArray.remove(i);
+					i--;
+				}
+			}
+		}
+		
+		else if (filterType.equals("Status")) {
+			for (int i = 0; i < taskArray.size(); i++) {
+				if (!taskArray.get(i).getStatus().toString().equalsIgnoreCase(filterPackage)) {
+					taskArray.remove(i);
+					i--;
+				}
+			}
+		}
+		
+		else if (filterType.equals("Project")) {
+			for (int i = 0; i < taskArray.size(); i++) {
+				Task task = taskArray.get(i);
+				if (task.getProject() == null || !task.getProject().getName().equalsIgnoreCase(filterPackage)) {
+					taskArray.remove(i);
+					i--;
+				}
+			}
+		}
+		
+		else if (filterType.equals("Date range")) {
+			String[] dates = filterPackage.split(",");
+			LocalDate startDate = LocalDate.parse(dates[0]);
+			LocalDate endDate = LocalDate.parse(dates[1]);
+			
+			for (int i = 0; i < taskArray.size(); i++) {
+				Task task = taskArray.get(i);
+				LocalDate dueDate = task.getDueDate();
+				
+				if (dueDate == null || dueDate.isBefore(startDate) || dueDate.isAfter(endDate)) {
+					taskArray.remove(i);
+					i--;
+				}
+			}
+		}
+		
+		else if (filterType.equals("Tag")) {
+			for (int i = 0; i < taskArray.size(); i++) {
+				Task task = taskArray.get(i);
+				boolean hasTag = false;
+				
+				for (int j = 0; j < task.getTags().size(); j++) {
+					if (task.getTags().get(j).getTitle().equalsIgnoreCase(filterPackage)) {
+						hasTag = true;
+						break;
+					}
+				}
+				
+				if (!hasTag) {
+					taskArray.remove(i);
+					i--;
+				}
+			}
+		}
+		
+		if (sortType.equals("Due date")) {
+			Collections.sort(taskArray, new Comparator<Task>() {
+				public int compare(Task t1, Task t2) {
+					LocalDate d1 = t1.getDueDate();
+					LocalDate d2 = t2.getDueDate();
+					
+					if (d1 == null && d2 == null) return 0;
+					if (d1 == null) return 1;
+					if (d2 == null) return -1;
+					return d1.compareTo(d2);
+				}
+			});
+		}
+		
+		else if (sortType.equals("Priority")) {
+			Collections.sort(taskArray, new Comparator<Task>() {
+				public int compare(Task t1, Task t2) {
+					int p1 = getPriorityValue(t1.getPriority().toString());
+					int p2 = getPriorityValue(t2.getPriority().toString());
+					return Integer.compare(p1, p2);
+				}
+			});
+		}
+		
+		if (sortOrder.equals("Descending")) Collections.reverse(taskArray);
+		
 		return taskArray;
 	}
+
+	private int getPriorityValue(String priority) {
+		if (priority.equalsIgnoreCase("Low")) return 1;
+		if (priority.equalsIgnoreCase("Medium")) return 2;
+		if (priority.equalsIgnoreCase("High")) return 3;
+		return 0;
+	}
 	
-	public ArrayList<Task> searchTasksDates(String startDate, String endDate) {
-	    ArrayList<Task> result = new ArrayList<>();
-
-	    LocalDate start = LocalDate.parse(startDate);
-	    LocalDate end = LocalDate.parse(endDate);
-
-	    for (Task task : taskList.getTasks()) {
-	        LocalDate due = task.getDueDate();
-	        if (due != null &&
-	            (due.isEqual(start) || due.isAfter(start)) &&
-	            (due.isEqual(end) || due.isBefore(end))) {
-	            result.add(task);
-	        }
-	    }
-
-	    return result;
+	public Task getTaskByName(String taskName) {
+		for (Task task : taskList.getTasks()) {
+			if (task.getTitle().equalsIgnoreCase(taskName)) return task;
+		}
+		return null;
 	}
-
-	public ArrayList<Task> searchTasksKeyword(String keyword) {
-	    ArrayList<Task> result = new ArrayList<>();
-	    String lowerKeyword = keyword.toLowerCase();
-
-	    for (Task task : taskList.getTasks()) {
-	        String title = task.getTitle() == null ? "" : task.getTitle().toLowerCase();
-	        String description = task.getDescription() == null ? "" : task.getDescription().toLowerCase();
-	        if (title.contains(lowerKeyword) || description.contains(lowerKeyword)) {
-	            result.add(task);
-	        }
-	    }
-	    return result;
+	
+	public void createActivityEntry(Task task, String description) {
+		LocalDateTime timestamp = LocalDateTime.now();
+		this.activityEntryList.createActivityEntry(task, description, timestamp);
 	}
+	
+	public ArrayList<ActivityEntry> getActivity(Task task){
+		ArrayList<ActivityEntry> output = new ArrayList<ActivityEntry>();
+		for (ActivityEntry activity : this.activityEntryList.getActivityEntryList()) {
+			if (activity.getTask().getTitle().equalsIgnoreCase(task.getTitle())) output.add(activity);
+		}
+		return output;
+	}
+	
+	//---------------------------------------------------------------
+	//Tag section
+	//---------------------------------------------------------------
+	public ArrayList<Tag> getTags() {
+		return this.tagList.getTags();
+	}
+	
+	public void createTag(String title) {
+		tagList.createTag(title);
+	}
+	
+	public Tag getTagByName(String tagName) {
+		for (Tag tag : tagList.getTags()) {
+			if (tag.getTitle().equalsIgnoreCase(tagName)) return tag;
+		}
+		return null;
+	}
+	
+	public void addTagToTask(Task task, String tagName) {
+		Tag tag = getTagByName(tagName);
+		task.getTags().add(tag);
+	}
+	
+	public void removeTagFromTask(Task task, String tagName) {
+		Tag tag = getTagByName(tagName);
+		task.getTags().remove(tag);
+	}
+	
+	//---------------------------------------------------------------
+	//Project section
+	//---------------------------------------------------------------
+	
+	public ArrayList<Project> getProjects() {
+		return this.projectList.getProjects();
+	}
+	
+	public void createProject(String title, String description) {
+		projectList.createProject(title, description);
+	}
+	
+	public Project getProjectByName(String projectName) {
+		for (Project project : projectList.getProjects()) {
+			if (project.getName().equalsIgnoreCase(projectName)) return project;
+		}
+		return null;
+	}
+	
+	public void updateTaskProject(Task task, String projectName) {
+		Project project = getProjectByName(projectName);
+		task.setProject(project);
+	}
+	
 	//---------------------------------------------------------------
 	//Comparators
 	//---------------------------------------------------------------
@@ -82,11 +292,11 @@ public class TaskSystem {
 	    };
 	}
 
-	private static int priorityValue(String p) {
+	private static int priorityValue(Priority p) {
 	    switch (p) {
-	        case "High": return 0;
-	        case "Medium": return 1;
-	        case "Low": return 2;
+	        case HIGH: return 0;
+	        case MEDIUM: return 1;
+	        case LOW: return 2;
 	        default: return 3;
 	    }
 	}
@@ -100,16 +310,16 @@ public class TaskSystem {
 	    };
 	}
 
-	private static int statusValue(String s) {
+	private static int statusValue(TaskStatus s) {
 	    switch (s) {
-	        case "Open": return 0;
-	        case "In Progress": return 1;
-	        case "Completed": return 2;
+	        case OPEN: return 0;
+	        case COMPLETED: return 1;
+	        case CANCELLED: return 2;
 	        default: return 3;
 	    }
 	}
 	//---------------------------------------------------
-	//CSV Operations
+	//Import/Export
 	//---------------------------------------------------
 	 public void exportToCSV(String fileName) throws IOException {
 	        try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileName))) {
@@ -125,9 +335,14 @@ public class TaskSystem {
 	                writer.write(",");
 	                writer.write(task.getDueDate() == null ? "" : task.getDueDate().toString());
 	                writer.write(",");
-	                writer.write(task.getPriority());
+	                writer.write(task.getPriority().toString());
 	                writer.write(",");
-	                writer.write(task.getStatus());
+	                writer.write(task.getStatus().toString());
+	                writer.write(",");
+	                writer.write(task.getParentTask().getTitle());
+	                writer.write(",");
+	                String tagNames = task.getTags().stream().map(Tag::getTitle).collect(Collectors.joining("|"));
+	                writer.write(tagNames);
 	                writer.newLine();
 	            }
 	        }
@@ -157,15 +372,19 @@ public class TaskSystem {
 	                String dueDate = fields.get(3);
 	                String priority = fields.get(4);
 	                String status = fields.get(5);
+	                String parentTask = fields.get(6);
+	                String tagsField = fields.get(7);
 
-	                Task task = new Task(title, description, dueDate, priority);
+	                ArrayList<Tag> tags = new ArrayList<>();
 
-	                if (!creationDate.isEmpty()) {
-	                    task.setCreationDate(LocalDate.parse(creationDate));
+	                if (!tagsField.isEmpty()) {
+	                    String[] tagNames = tagsField.split("\\|");
+	                    for (String tagName : tagNames) {
+	                        tags.add(new Tag(tagName));
+	                    }
 	                }
 
-	                task.setStatus(status);
-	                taskList.getTasks().add(task);
+	                createImportedTask(title, description, creationDate, dueDate, priority, status, parentTask, tags);
 	            }
 	        }
 	        

@@ -6,20 +6,23 @@ public class Task {
 	private String description;
 	private LocalDate creationDate;
 	private LocalDate dueDate;
-	private String priority;
-	private String status;
-	private ArrayList<Task> subTasks;
+	private Priority priority;
+	private TaskStatus status;
+	private Task parentTask;
+	private ArrayList<Tag> tags;
+	private Project project;
 	
-	public Task(String title, String description, String dueDate, String priority) {
+	public Task(String title, String description, LocalDate dueDate, Priority priority) {
 		this.title = title;
 		this.description = description;
 		this.creationDate = LocalDate.now();
-		if (dueDate.length()>0) this.dueDate = LocalDate.parse(dueDate);
-		else this.dueDate = null;
+		this.dueDate = dueDate;
 		this.priority = priority;
-		this.status = "Open";
-		this.subTasks = new ArrayList<Task>();
+		this.status = TaskStatus.OPEN;
+		this.project = null;
+		this.tags = new ArrayList<Tag>();
 	}
+	
 	
 	@Override
 	public String toString() {
@@ -28,20 +31,22 @@ public class Task {
 				+ "\nDescription: " + this.description
 				+ "\n\nCreated on: " + this.creationDate
 				);
-				
+		if (project != null) output += ("\nProject: " + this.project.getName());
+		if (parentTask != null) output += ("\nParent Task: " + this.parentTask.getTitle());
+		
+		
 		if (dueDate != null) output += ("\nDue date: " + this.dueDate);
 		
 		output += ("\n\nPriority: " + this.priority
 				+ "\nStatus: " + this.status
 				);
 		
-		if (this.subTasks.size() > 0) {
-			output += "\n\nSubtasks:";
-			for (int i = 0; i<subTasks.size(); i++) {
-				output += "\n" + (i+1) + ": " + subTasks.get(i).title;
+		if (tags.size() > 0) {
+			output += ("\n\nTags: " );
+			for (Tag tag : tags) {
+				output += (tag + ", ");
 			}
 		}
-		
 		return output;
 	}
 
@@ -76,30 +81,73 @@ public class Task {
 	public void setDueDate(LocalDate dueDate) {
 		this.dueDate = dueDate;
 	}
-
-	public String getPriority() {
+	
+	public Priority getPriority() {
 		return priority;
 	}
 
-	public void setPriority(String priority) {
+	public void setPriority(Priority priority) {
 		this.priority = priority;
 	}
+	
+	public void setPriority(String priority) {
+		switch(priority) {
+		case "1":
+			this.priority = Priority.LOW;
+			break;
+		case "2":
+			this.priority = Priority.MEDIUM;
+			break;
+		case "3":
+			this.priority = Priority.HIGH;
+			break;
+		}
+	}
 
-	public String getStatus() {
+	public TaskStatus getStatus() {
 		return status;
 	}
 
-	public void setStatus(String status) {
+	public void setStatus(TaskStatus status) {
 		this.status = status;
 	}
-
-	public ArrayList<Task> getSubTasks() {
-		return subTasks;
-	}
-
-	public void setSubTasks(ArrayList<Task> subTasks) {
-		this.subTasks = subTasks;
-	}
 	
+	public void setStatus(String status) {
+		switch(status) {
+		case "1":
+			this.status = TaskStatus.OPEN;
+			break;
+		case "2":
+			this.status = TaskStatus.COMPLETED;
+			break;
+		case "3":
+			this.status = TaskStatus.CANCELLED;
+			break;
+		}
+	}
+
+	public Task getParentTask() {
+		return parentTask;
+	}
+
+	public void setParentTask(Task parentTask) {
+		this.parentTask = parentTask;
+	}
+
+	public ArrayList<Tag> getTags() {
+		return tags;
+	}
+
+	public void setTags(ArrayList<Tag> tags) {
+		this.tags = tags;
+	}
+
+	public Project getProject() {
+		return project;
+	}
+
+	public void setProject(Project project) {
+		this.project = project;
+	}
 	
 }

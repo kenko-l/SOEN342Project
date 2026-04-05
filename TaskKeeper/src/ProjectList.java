@@ -7,10 +7,12 @@ public class ProjectList {
 		this.projects = new ArrayList<Project>();
 	}
 	
-	public Project get(String id) {
-		return null;
+	public ArrayList<Project> getProjects() {
+		return this.projects;
 	}
 	
-	public void create(String name, String description) {
+	public void createProject(String name, String description) {
+		Project newProject = new Project(name, description);
+		this.projects.add(newProject);
 	}
 }
