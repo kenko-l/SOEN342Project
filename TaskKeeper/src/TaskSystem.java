@@ -1,5 +1,6 @@
 import java.io.*;
 import java.nio.file.*;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -10,12 +11,14 @@ public class TaskSystem {
 	private ProjectList projectList;
 	private TagList tagList;
 	private ActivityEntryList activityEntryList;
+	private ArrayList<RecurrenceRule> recurrenceRules;
 	
 	public TaskSystem() {
 		this.taskList = new TaskList();
 		this.projectList = new ProjectList();
 		this.tagList = new TagList();
 		this.activityEntryList = new ActivityEntryList();
+		this.recurrenceRules = new ArrayList<RecurrenceRule>();
 	}
 	
 	//-----------------------------------------------------------------------
@@ -40,6 +43,26 @@ public class TaskSystem {
 		if (!taskDueDate.equals("")) formattedDueDate = LocalDate.parse(taskDueDate);
 		
 		taskList.createTask(taskName, taskDescription, formattedDueDate, formattedTaskPriority);
+	}
+	
+	public Task createDummyTask(String taskName, String taskDescription, String taskPriority, String taskDueDate) {
+		Priority formattedTaskPriority = null;
+		switch(taskPriority) {
+		case "1":
+			formattedTaskPriority = Priority.LOW;
+			break;
+		case "2":
+			formattedTaskPriority = Priority.MEDIUM;
+			break;
+		case "3":
+			formattedTaskPriority = Priority.HIGH;
+			break;
+		}
+		
+		LocalDate formattedDueDate = null;
+		if (!taskDueDate.equals("")) formattedDueDate = LocalDate.parse(taskDueDate);
+		
+		return taskList.createDummyTask(taskName, taskDescription, formattedDueDate, formattedTaskPriority);
 	}
 	
 	public void createSubtask(Task parentTask, String taskName, String taskDescription, String taskPriority, String taskDueDate) {
@@ -283,6 +306,103 @@ public class TaskSystem {
 		return output;
 	}
 	
+	public void createRecurrenceRule(Task task, String recurrencePattern, String recurrenceDay, LocalDate recurrenceStartDate, LocalDate recurrenceEndDate) {
+		RecurrenceRule recurrenceRule = new RecurrenceRule(recurrencePattern, recurrenceDay, task, recurrenceStartDate, recurrenceEndDate);
+		this.recurrenceRules.add(recurrenceRule);
+		generateRecurrenceTasks(recurrenceRule);
+	}
+	
+	public void generateRecurrenceTasks(RecurrenceRule recurrenceRule) {
+		String pattern = recurrenceRule.getPattern();
+		if (pattern.equals("")) {
+			return;
+		}
+		
+		Task originalTask = recurrenceRule.getTask();
+		LocalDate startDate = recurrenceRule.getStartDate();
+		LocalDate endDate = recurrenceRule.getEndDate();
+		LocalDate currentDate = LocalDate.now();
+		
+		if (endDate.isBefore(currentDate)) {
+			return;
+		}
+		
+		LocalDate baseDate;
+		if (startDate.isAfter(currentDate)) {
+			baseDate = startDate;
+		}
+		else {
+			baseDate = currentDate;
+		}
+		
+		if (pattern.equals("Daily")) {
+			LocalDate dueDate = baseDate;
+			for (int i = 0; i < 3; i++) {
+				if (dueDate.isAfter(endDate)) {
+					break;
+				}
+				
+				String newTitle = originalTask.getTitle() + " (" + dueDate.toString() + ")";
+				if (getTaskByName(newTitle) == null) {
+					createTask(newTitle, originalTask.getDescription(), originalTask.getPriority().toString(), dueDate.toString());
+				}
+				
+				dueDate = dueDate.plusDays(1);
+			}
+		}
+		
+		else if (pattern.equals("Weekly")) {
+			LocalDate dueDate = baseDate;
+			DayOfWeek targetDay = DayOfWeek.valueOf(recurrenceRule.getPatternKey().toUpperCase());
+			
+			while (!dueDate.getDayOfWeek().equals(targetDay)) {
+				dueDate = dueDate.plusDays(1);
+			}
+			
+			for (int i = 0; i < 3; i++) {
+				if (dueDate.isAfter(endDate)) {
+					break;
+				}
+				
+				String newTitle = originalTask.getTitle() + " (" + dueDate.toString() + ")";
+				if (getTaskByName(newTitle) == null) {
+					createTask(newTitle, originalTask.getDescription(), originalTask.getPriority().toString(), dueDate.toString());
+				}
+				
+				dueDate = dueDate.plusWeeks(1);
+			}
+		}
+		
+		else if (pattern.equals("Monthly")) {
+			int targetDay = Integer.parseInt(recurrenceRule.getPatternKey());
+			LocalDate dueDate = baseDate.withDayOfMonth(1);
+			
+			if (baseDate.getDayOfMonth() > targetDay) {
+				dueDate = dueDate.plusMonths(1);
+			}
+			
+			for (int i = 0; i < 3; i++) {
+				int lastDayOfMonth = dueDate.lengthOfMonth();
+				if (targetDay <= lastDayOfMonth) {
+					LocalDate candidateDate = dueDate.withDayOfMonth(targetDay);
+					
+					if (!candidateDate.isBefore(baseDate)) {
+						if (candidateDate.isAfter(endDate)) {
+							break;
+						}
+						
+						String newTitle = originalTask.getTitle() + " (" + candidateDate.toString() + ")";
+						if (getTaskByName(newTitle) == null) {
+							createTask(newTitle, originalTask.getDescription(), originalTask.getPriority().toString(), candidateDate.toString());
+						}
+					}
+				}
+				
+				dueDate = dueDate.plusMonths(1).withDayOfMonth(1);
+			}
+		}
+	}
+	
 	//---------------------------------------------------------------
 	//Tag section
 	//---------------------------------------------------------------
@@ -347,10 +467,13 @@ public class TaskSystem {
 		switch(category) {
 		case "1":
 			formattedCategory = Category.JUNIOR;
+			break;
 		case "2":
 			formattedCategory = Category.INTERMEDIATE;
+			break;
 		case "3":
 			formattedCategory = Category.SENIOR;
+			break;
 		}
 		project.addCollaborator(new Collaborator(name, formattedCategory));
 	}

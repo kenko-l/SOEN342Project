@@ -25,7 +25,7 @@ public class Collaborator {
 	}
 	
 	public String toString() {
-		return ("Name: " + this.name + "\nCategory: " + this.category.toString());
+		return (this.name + " - " + this.category.toString());
 	}
 	
 }

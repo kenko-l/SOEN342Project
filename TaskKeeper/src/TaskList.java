@@ -13,6 +13,10 @@ public class TaskList {
 		this.tasks.add(newTask);
 	}
 	
+	public Task createDummyTask(String title, String description, LocalDate dueDate, Priority priority) {
+		return new Task(title, description, dueDate, priority);
+	}
+	
 	public void createSubtask(Task parentTask, String title, String description, LocalDate dueDate, Priority priority) {
 		Subtask newTask = new Subtask(parentTask, title, description, dueDate, priority);
 		this.tasks.add(newTask);

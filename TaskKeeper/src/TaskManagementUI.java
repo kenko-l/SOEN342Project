@@ -87,6 +87,12 @@ public class TaskManagementUI {
 		String taskDescription;
 		String taskPriority;
 		String taskDueDate;
+		String recurringOption = "2";
+		String recurrencePattern = "";
+		String recurrenceDay = "";
+		LocalDate recurrenceStartDate = null;
+		LocalDate recurrenceEndDate = null;
+		
 		while(true) {
 			System.out.print("Enter task name: ");
 			taskName = sc.nextLine().trim();
@@ -114,6 +120,121 @@ public class TaskManagementUI {
 			}
 			catch(Exception e) {
 				System.out.println("Invalid date format");
+			}
+		}
+		
+		if (taskType.equals("Task")) {
+			while(true) {
+				System.out.println("Is this a recurring task?");
+				System.out.println("1. Yes");
+				System.out.println("2. No");
+				recurringOption = sc.nextLine().trim();
+				if (recurringOption.equals("1") || recurringOption.equals("2")) break;
+				else System.out.println("Invalid selection");
+			}
+			
+			if (recurringOption.equals("1")) {
+				while(true) {
+					System.out.println("Choose recurrence pattern:");
+					System.out.println("1. Daily");
+					System.out.println("2. Weekly");
+					System.out.println("3. Monthly");
+					String recurrenceInput = sc.nextLine().trim();
+					if (recurrenceInput.equals("1")) {
+						recurrencePattern = "Daily";
+						break;
+					}
+					else if (recurrenceInput.equals("2")) {
+						recurrencePattern = "Weekly";
+						break;
+					}
+					else if (recurrenceInput.equals("3")) {
+						recurrencePattern = "Monthly";
+						break;
+					}
+					else System.out.println("Invalid selection");
+				}
+				
+				if (recurrencePattern.equals("Weekly")) {
+					while(true) {
+						System.out.println("Choose day of week:");
+						System.out.println("1. Monday");
+						System.out.println("2. Tuesday");
+						System.out.println("3. Wednesday");
+						System.out.println("4. Thursday");
+						System.out.println("5. Friday");
+						System.out.println("6. Saturday");
+						System.out.println("7. Sunday");
+						String dayInput = sc.nextLine().trim();
+						if (dayInput.equals("1")) {
+							recurrenceDay = "MONDAY";
+							break;
+						}
+						else if (dayInput.equals("2")) {
+							recurrenceDay = "TUESDAY";
+							break;
+						}
+						else if (dayInput.equals("3")) {
+							recurrenceDay = "WEDNESDAY";
+							break;
+						}
+						else if (dayInput.equals("4")) {
+							recurrenceDay = "THURSDAY";
+							break;
+						}
+						else if (dayInput.equals("5")) {
+							recurrenceDay = "FRIDAY";
+							break;
+						}
+						else if (dayInput.equals("6")) {
+							recurrenceDay = "SATURDAY";
+							break;
+						}
+						else if (dayInput.equals("7")) {
+							recurrenceDay = "SUNDAY";
+							break;
+						}
+						else System.out.println("Invalid selection");
+					}
+				}
+				else if (recurrencePattern.equals("Monthly")) {
+					while(true) {
+						System.out.println("Enter day of month: ");
+						String dayInput = sc.nextLine().trim();
+						try {
+							int dayOfMonth = Integer.parseInt(dayInput);
+							if (dayOfMonth >= 1 && dayOfMonth <= 31) {
+								recurrenceDay = dayInput;
+								break;
+							}
+							else System.out.println("Day must be between 1 and 31");
+						}
+						catch(Exception e) {
+							System.out.println("Invalid day");
+						}
+					}
+				}
+				
+				while(true) {
+					try {
+						System.out.println("Enter recurrence start date YYYY-MM-DD: ");
+						recurrenceStartDate = LocalDate.parse(sc.nextLine().trim());
+						System.out.println("Enter recurrence end date YYYY-MM-DD: ");
+						recurrenceEndDate = LocalDate.parse(sc.nextLine().trim());
+						if (recurrenceEndDate.isBefore(recurrenceStartDate)) {
+							System.out.println("End date cannot be before start date");
+						}
+						else {
+							break;
+						}
+					}
+					catch(Exception e) {
+						System.out.println("Invalid date format");
+					}
+				}
+				Task task = taskSystem.createDummyTask(taskName, taskDescription, taskPriority, taskDueDate);
+				taskSystem.createRecurrenceRule(task, recurrencePattern, recurrenceDay, recurrenceStartDate, recurrenceEndDate);
+				return;
 			}
 		}
 		
@@ -151,7 +272,7 @@ public class TaskManagementUI {
 			if (!subtasks.isEmpty()) {
 				System.out.println("\nSubtasks: ");
 				for (int i = 0; i<subtasks.size(); i++) {
-				System.out.println((i+1) + ": " + subtasks.get(i).getTitle());
+				System.out.println((i+1) + ": " + subtasks.get(i).getTitle() + " - " + subtasks.get(i).getStatus());
 				}
 			}
 			System.out.println();
@@ -176,6 +297,7 @@ public class TaskManagementUI {
 				System.out.println("Invalid selection");
 			}
 			
+			taskUpdateSwitch:
 			switch(UserInput) {
 			case "1":
 				String newTitle;
@@ -259,15 +381,12 @@ public class TaskManagementUI {
 				}
 				ArrayList<CollaboratorTask> collaboratorTasks = taskSystem.getTaskCollaboratorTasks(targetTask);
 				
-				boolean nocollaborators = false;
 				for (CollaboratorTask collaboratorTask : collaboratorTasks) {
 					if (collaboratorTask.getStatus() == TaskStatus.OPEN) {
 						System.out.println("Cannot change project if task has an open collaborated subtask");
-						nocollaborators = true;
-						break;
+						break taskUpdateSwitch;
 					}
 				}
-				if (nocollaborators) break;
 				
 				ArrayList<Project> projects = taskSystem.getProjects();
 				String projectName;
@@ -386,6 +505,7 @@ public class TaskManagementUI {
 			case "8":
 				if (targetTask instanceof Subtask) {
 					System.out.println("Cannot create a subtask for a subtask");
+					break;
 				}
 				handleTaskCreation("Subtask", targetTask, null);
 				break;
@@ -414,6 +534,10 @@ public class TaskManagementUI {
 					collaborator = taskSystem.getCollaboratorByName(targetTask.getProject(), collaboratorName);
 					if (collaborator != null) break;
 					else System.out.println("Collaborator does not exist");
+				}
+				if (taskSystem.isAtCapacity(targetTask.getProject(), collaborator)) {
+					System.out.println("Collaborator is at capacity");
+					break;
 				}
 				handleTaskCreation("CollaboratorTask", targetTask, collaborator);
 				break;
@@ -594,7 +718,7 @@ public class TaskManagementUI {
 					if (!subtasks.isEmpty()) {
 						System.out.println("\nSubtasks: ");
 						for (int i = 0; i<subtasks.size(); i++) {
-						System.out.println((i+1) + ": " + subtasks.get(i).getTitle());
+						System.out.println((i+1) + ": " + subtasks.get(i).getTitle() + " - " + subtasks.get(i).getStatus());
 						}
 					}
 					System.out.println("/-----------------------------------------------/");

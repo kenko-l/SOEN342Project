@@ -44,9 +44,9 @@ public class Project {
 						"\nDescription: " + this.description);
 		
 		if (!collaborators.isEmpty()) {
-			output += "Collaborators: ";
+			output += "\nCollaborators: ";
 			for (Collaborator collaborator : collaborators) {
-				output += collaborator;
+				output += "\n" + collaborator;
 			}
 		}
 		return output;
