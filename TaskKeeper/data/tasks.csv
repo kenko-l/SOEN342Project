@@ -1,0 +1,7 @@
+type,title,description,creation_date,due_date,priority,status,project,parent_task,collaborator,tags
+TASK,recurring task (2026-04-15),tsdf,2026-04-15,2026-04-15,MEDIUM,OPEN,,,,
+TASK,recurring task (2026-04-16),tsdf,2026-04-15,2026-04-16,MEDIUM,OPEN,,,,
+TASK,recurring task (2026-04-17),tsdf,2026-04-15,2026-04-17,MEDIUM,OPEN,,,,
+TASK,task,,2026-04-15,,LOW,COMPLETED,project,,,football
+SUBTASK,subtask,,2026-04-15,,MEDIUM,OPEN,project,task,,football
+COLLABORATORTASK,collab task,,2026-04-15,,MEDIUM,OPEN,project,task,jem,football

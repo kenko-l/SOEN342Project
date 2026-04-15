@@ -27,8 +27,20 @@ public class TaskList {
 		this.tasks.add(newTask);
 	}
 	
-	public void createImportedTask(String taskName, String taskDescription, LocalDate taskCreationDate, LocalDate taskDueDate, Priority taskPriority, TaskStatus taskStatus, Task parentTask, ArrayList<Tag> tags) {
-		Task newTask = new Task(taskName, taskDescription, taskDueDate, taskPriority);
+	public void addTask(Task task) {
+		this.tasks.add(task);
+	}
+
+	public void createImportedSubtask(Task parentTask, String taskName, String taskDescription, LocalDate taskCreationDate, LocalDate taskDueDate, Priority taskPriority, TaskStatus taskStatus, ArrayList<Tag> tags) {
+		Subtask newTask = new Subtask(parentTask, taskName, taskDescription, taskDueDate, taskPriority);
+		newTask.setCreationDate(taskCreationDate);
+		newTask.setStatus(taskStatus);
+		newTask.setTags(tags);
+		this.tasks.add(newTask);
+	}
+
+	public void createImportedCollaboratorTask(Collaborator collaborator, Task parentTask, String taskName, String taskDescription, LocalDate taskCreationDate, LocalDate taskDueDate, Priority taskPriority, TaskStatus taskStatus, ArrayList<Tag> tags) {
+		CollaboratorTask newTask = new CollaboratorTask(collaborator, parentTask, taskName, taskDescription, taskDueDate, taskPriority);
 		newTask.setCreationDate(taskCreationDate);
 		newTask.setStatus(taskStatus);
 		newTask.setTags(tags);

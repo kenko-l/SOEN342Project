@@ -4,7 +4,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class TaskSystem {
 	private TaskList taskList;
@@ -26,7 +25,7 @@ public class TaskSystem {
 	//-----------------------------------------------------------------------
 	
 	public void createTask(String taskName, String taskDescription, String taskPriority, String taskDueDate) {
-		Priority formattedTaskPriority = null;
+		Priority formattedTaskPriority = null;		
 		switch(taskPriority) {
 		case "1":
 			formattedTaskPriority = Priority.LOW;
@@ -105,42 +104,6 @@ public class TaskSystem {
 		taskList.createCollaboratorTask(collaborator, parentTask, taskName, taskDescription, formattedDueDate, formattedTaskPriority);
 	}
 	
-	public void createImportedTask(String taskName, String taskDescription, String taskCreationDate, String taskDueDate, String taskPriority, String taskStatus, String parentTask, ArrayList<Tag> tags) {
-		if (getTaskByName(taskName) != null) {
-			System.out.println("Could not import task '" + taskName + "': Task name already in use");
-			return;
-		}
-		
-		LocalDate formattedCreationDate = LocalDate.parse(taskCreationDate);
-		LocalDate formattedDueDate = LocalDate.parse(taskDueDate);
-		Priority formattedTaskPriority = null;
-		switch(taskPriority) {
-		case "LOW":
-			formattedTaskPriority = Priority.LOW;
-			break;
-		case "MEDIUM":
-			formattedTaskPriority = Priority.MEDIUM;
-			break;
-		case "HIGH":
-			formattedTaskPriority = Priority.HIGH;
-			break;
-		}
-		TaskStatus formmatedStatus = null;
-		switch(taskStatus) {
-		case "OPEN":
-			formmatedStatus = TaskStatus.OPEN;
-			break;
-		case "COMPLETED":
-			formmatedStatus = TaskStatus.COMPLETED;
-			break;
-		case "CANCELED":
-			formmatedStatus = TaskStatus.CANCELLED;
-			break;
-		}
-		Task formattedParentTask = getTaskByName(parentTask);
-		
-		taskList.createImportedTask(taskName, taskDescription, formattedCreationDate, formattedDueDate, formattedTaskPriority, formmatedStatus, formattedParentTask, tags);
-	}
 	
 	public ArrayList<Task> getTasks(String filterType, String filterPackage, String sortType, String sortOrder) {
 		ArrayList<Task> taskArray = new ArrayList<Task>(this.taskList.getTasks());
@@ -344,7 +307,7 @@ public class TaskSystem {
 				
 				String newTitle = originalTask.getTitle() + " (" + dueDate.toString() + ")";
 				if (getTaskByName(newTitle) == null) {
-					createTask(newTitle, originalTask.getDescription(), originalTask.getPriority().toString(), dueDate.toString());
+					taskList.createTask(newTitle, originalTask.getDescription(), dueDate, originalTask.getPriority());
 				}
 				
 				dueDate = dueDate.plusDays(1);
@@ -366,7 +329,7 @@ public class TaskSystem {
 				
 				String newTitle = originalTask.getTitle() + " (" + dueDate.toString() + ")";
 				if (getTaskByName(newTitle) == null) {
-					createTask(newTitle, originalTask.getDescription(), originalTask.getPriority().toString(), dueDate.toString());
+					taskList.createTask(newTitle, originalTask.getDescription(), dueDate, originalTask.getPriority());
 				}
 				
 				dueDate = dueDate.plusWeeks(1);
@@ -393,7 +356,7 @@ public class TaskSystem {
 						
 						String newTitle = originalTask.getTitle() + " (" + candidateDate.toString() + ")";
 						if (getTaskByName(newTitle) == null) {
-							createTask(newTitle, originalTask.getDescription(), originalTask.getPriority().toString(), candidateDate.toString());
+							taskList.createTask(newTitle, originalTask.getDescription(), dueDate, originalTask.getPriority());
 						}
 					}
 				}
@@ -564,5 +527,724 @@ public class TaskSystem {
 	//---------------------------------------------------
 	//Import/Export
 	//---------------------------------------------------
+	
+	private String cleanCsv(String value) {
+		if (value == null) return "";
+		return value.replace(",", "<comma>").replace("\n", "<newline>");
+	}
+
+	private String uncleanCsv(String value) {
+		if (value == null) return "";
+		return value.replace("<comma>", ",").replace("<newline>", "\n");
+	}
+
+	private ArrayList<Tag> parseTags(String tagString) {
+		ArrayList<Tag> output = new ArrayList<Tag>();
+		if (tagString == null || tagString.equals("")) return output;
+		
+		String[] splitTags = tagString.split("\\|");
+		for (int i = 0; i < splitTags.length; i++) {
+			Tag tag = getTagByName(splitTags[i]);
+			if (tag != null) {
+				output.add(tag);
+			}
+		}
+		return output;
+	}
+
+	private String tagsToString(ArrayList<Tag> tags) {
+		String output = "";
+		for (int i = 0; i < tags.size(); i++) {
+			output += tags.get(i).getTitle();
+			if (i < tags.size() - 1) {
+				output += "|";
+			}
+		}
+		return output;
+	}
+
+	private Priority parsePriority(String priority) {
+		if (priority.equals("LOW")) return Priority.LOW;
+		if (priority.equals("MEDIUM")) return Priority.MEDIUM;
+		if (priority.equals("HIGH")) return Priority.HIGH;
+		return null;
+	}
+
+	private TaskStatus parseStatus(String status) {
+		if (status.equals("OPEN")) return TaskStatus.OPEN;
+		if (status.equals("COMPLETED")) return TaskStatus.COMPLETED;
+		if (status.equals("CANCELLED")) return TaskStatus.CANCELLED;
+		return null;
+	}
+
+	private Category parseCategory(String category) {
+		if (category.equals("JUNIOR")) return Category.JUNIOR;
+		if (category.equals("INTERMEDIATE")) return Category.INTERMEDIATE;
+		if (category.equals("SENIOR")) return Category.SENIOR;
+		return null;
+	}
+	
+	public void exportDatabase() {
+		try {
+			Files.createDirectories(Paths.get("data"));
+			exportTags();
+			exportProjects();
+			exportCollaborators();
+			exportTasks();
+			exportRecurrenceRules();
+			exportActivityEntries();
+		}
+		catch(Exception e) {
+			System.out.println("Error exporting database");
+		}
+	}
+
+	public void importDatabase() {
+		try {
+			this.taskList = new TaskList();
+			this.projectList = new ProjectList();
+			this.tagList = new TagList();
+			this.activityEntryList = new ActivityEntryList();
+			this.recurrenceRules = new ArrayList<RecurrenceRule>();
+			
+			importTags();
+			importProjects();
+			importCollaborators();
+			importTasks();
+			importRecurrenceRules();
+			importActivityEntries();
+		}
+		catch(Exception e) {
+			System.out.println("Error importing database");
+		}
+	}
+	
+	private void exportTags() {
+		try {
+			PrintWriter writer = new PrintWriter("data/tags.csv");
+			writer.println("title");
+			for (Tag tag : getTags()) {
+				writer.println(cleanCsv(tag.getTitle()));
+			}
+			writer.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not export tags");
+		}
+	}
+
+	private void importTags() {
+		File file = new File("data/tags.csv");
+		if (!file.exists()) return;
+		
+		try {
+			Scanner fileScanner = new Scanner(file);
+			if (fileScanner.hasNextLine()) fileScanner.nextLine();
+			
+			while(fileScanner.hasNextLine()) {
+				String line = fileScanner.nextLine();
+				if (!line.equals("")) {
+					createTag(uncleanCsv(line));
+				}
+			}
+			fileScanner.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not import tags");
+		}
+	}
+	
+	private void exportProjects() {
+		try {
+			PrintWriter writer = new PrintWriter("data/projects.csv");
+			writer.println("name,description");
+			for (Project project : getProjects()) {
+				writer.println(cleanCsv(project.getName()) + "," + cleanCsv(project.getDescription()));
+			}
+			writer.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not export projects");
+		}
+	}
+
+	private void importProjects() {
+		File file = new File("data/projects.csv");
+		if (!file.exists()) return;
+		
+		try {
+			Scanner fileScanner = new Scanner(file);
+			if (fileScanner.hasNextLine()) fileScanner.nextLine();
+			
+			while(fileScanner.hasNextLine()) {
+				String line = fileScanner.nextLine();
+				String[] parts = line.split(",", -1);
+				if (parts.length >= 2) {
+					createProject(uncleanCsv(parts[0]), uncleanCsv(parts[1]));
+				}
+			}
+			fileScanner.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not import projects");
+		}
+	}
+	
+	private void exportCollaborators() {
+		try {
+			PrintWriter writer = new PrintWriter("data/collaborators.csv");
+			writer.println("project,name,category");
+			for (Project project : getProjects()) {
+				for (Collaborator collaborator : project.getCollaborators()) {
+					writer.println(cleanCsv(project.getName()) + "," + cleanCsv(collaborator.getName()) + "," + collaborator.getCategory());
+				}
+			}
+			writer.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not export collaborators");
+		}
+	}
+
+	private void importCollaborators() {
+		File file = new File("data/collaborators.csv");
+		if (!file.exists()) return;
+		
+		try {
+			Scanner fileScanner = new Scanner(file);
+			if (fileScanner.hasNextLine()) fileScanner.nextLine();
+			
+			while(fileScanner.hasNextLine()) {
+				String line = fileScanner.nextLine();
+				String[] parts = line.split(",", -1);
+				if (parts.length >= 3) {
+					Project project = getProjectByName(uncleanCsv(parts[0]));
+					if (project != null) {
+						Collaborator collaborator = new Collaborator(uncleanCsv(parts[1]), parseCategory(parts[2]));
+						project.addCollaborator(collaborator);
+					}
+				}
+			}
+			fileScanner.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not import collaborators");
+		}
+	}
+	
+	private void exportTasks() {
+		try {
+			PrintWriter writer = new PrintWriter("data/tasks.csv");
+			writer.println("type,title,description,creation_date,due_date,priority,status,project,parent_task,collaborator,tags");
+			
+			for (Task task : taskList.getTasks()) {
+				String type = "TASK";
+				String parentTask = "";
+				String collaborator = "";
+				
+				if (task instanceof CollaboratorTask) {
+					type = "COLLABORATORTASK";
+					parentTask = ((CollaboratorTask) task).getParentTask().getTitle();
+					collaborator = ((CollaboratorTask) task).getCollaborator().getName();
+				}
+				else if (task instanceof Subtask) {
+					type = "SUBTASK";
+					parentTask = ((Subtask) task).getParentTask().getTitle();
+				}
+				
+				String projectName = "";
+				if (task.getProject() != null) {
+					projectName = task.getProject().getName();
+				}
+				
+				String dueDate = "";
+				if (task.getDueDate() != null) {
+					dueDate = task.getDueDate().toString();
+				}
+				
+				writer.println(
+					type + "," +
+					cleanCsv(task.getTitle()) + "," +
+					cleanCsv(task.getDescription()) + "," +
+					task.getCreationDate() + "," +
+					dueDate + "," +
+					task.getPriority() + "," +
+					task.getStatus() + "," +
+					cleanCsv(projectName) + "," +
+					cleanCsv(parentTask) + "," +
+					cleanCsv(collaborator) + "," +
+					cleanCsv(tagsToString(task.getTags()))
+				);
+			}
+			writer.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not export tasks");
+		}
+	}
+	
+	private void importTasks() {
+		File file = new File("data/tasks.csv");
+		if (!file.exists()) return;
+		
+		ArrayList<String> lines = new ArrayList<String>();
+		
+		try {
+			Scanner fileScanner = new Scanner(file);
+			if (fileScanner.hasNextLine()) fileScanner.nextLine();
+			
+			while(fileScanner.hasNextLine()) {
+				lines.add(fileScanner.nextLine());
+			}
+			fileScanner.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not read tasks file");
+			return;
+		}
+		
+		for (String line : lines) {
+			String[] parts = line.split(",", -1);
+			if (parts.length < 11) continue;
+			if (!parts[0].equals("TASK")) continue;
+			
+			String title = uncleanCsv(parts[1]);
+			String description = uncleanCsv(parts[2]);
+			LocalDate creationDate = LocalDate.parse(parts[3]);
+			LocalDate dueDate = null;
+			if (!parts[4].equals("")) dueDate = LocalDate.parse(parts[4]);
+			Priority priority = parsePriority(parts[5]);
+			TaskStatus status = parseStatus(parts[6]);
+			Project project = null;
+			if (!parts[7].equals("")) project = getProjectByName(uncleanCsv(parts[7]));
+			ArrayList<Tag> tags = parseTags(uncleanCsv(parts[10]));
+			
+			Task task = new Task(title, description, dueDate, priority);
+			task.setCreationDate(creationDate);
+			task.setStatus(status);
+			task.setProject(project);
+			task.setTags(tags);
+			taskList.addTask(task);
+		}
+		
+		for (String line : lines) {
+			String[] parts = line.split(",", -1);
+			if (parts.length < 11) continue;
+			if (!parts[0].equals("SUBTASK")) continue;
+			
+			String title = uncleanCsv(parts[1]);
+			String description = uncleanCsv(parts[2]);
+			LocalDate creationDate = LocalDate.parse(parts[3]);
+			LocalDate dueDate = null;
+			if (!parts[4].equals("")) dueDate = LocalDate.parse(parts[4]);
+			Priority priority = parsePriority(parts[5]);
+			TaskStatus status = parseStatus(parts[6]);
+			Task parentTask = getTaskByName(uncleanCsv(parts[8]));
+			ArrayList<Tag> tags = parseTags(uncleanCsv(parts[10]));
+			
+			if (parentTask != null) {
+				taskList.createImportedSubtask(parentTask, title, description, creationDate, dueDate, priority, status, tags);
+			}
+		}
+		
+		for (String line : lines) {
+			String[] parts = line.split(",", -1);
+			if (parts.length < 11) continue;
+			if (!parts[0].equals("COLLABORATORTASK")) continue;
+			
+			String title = uncleanCsv(parts[1]);
+			String description = uncleanCsv(parts[2]);
+			LocalDate creationDate = LocalDate.parse(parts[3]);
+			LocalDate dueDate = null;
+			if (!parts[4].equals("")) dueDate = LocalDate.parse(parts[4]);
+			Priority priority = parsePriority(parts[5]);
+			TaskStatus status = parseStatus(parts[6]);
+			String projectName = uncleanCsv(parts[7]);
+			Task parentTask = getTaskByName(uncleanCsv(parts[8]));
+			String collaboratorName = uncleanCsv(parts[9]);
+			ArrayList<Tag> tags = parseTags(uncleanCsv(parts[10]));
+			
+			Project project = getProjectByName(projectName);
+			if (project != null && parentTask != null) {
+				Collaborator collaborator = getCollaboratorByName(project, collaboratorName);
+				if (collaborator != null) {
+					taskList.createImportedCollaboratorTask(collaborator, parentTask, title, description, creationDate, dueDate, priority, status, tags);
+				}
+			}
+		}
+	}
+	
+	private void exportRecurrenceRules() {
+		try {
+			PrintWriter writer = new PrintWriter("data/recurrence_rules.csv");
+			writer.println("task,pattern,pattern_key,start_date,end_date");
+			
+			for (RecurrenceRule rule : recurrenceRules) {
+				writer.println(
+					cleanCsv(rule.getTask().getTitle()) + "," +
+					cleanCsv(rule.getPattern()) + "," +
+					cleanCsv(rule.getPatternKey()) + "," +
+					rule.getStartDate() + "," +
+					rule.getEndDate()
+				);
+			}
+			writer.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not export recurrence rules");
+		}
+	}
+
+	private void importRecurrenceRules() {
+		File file = new File("data/recurrence_rules.csv");
+		if (!file.exists()) return;
+		
+		try {
+			Scanner fileScanner = new Scanner(file);
+			if (fileScanner.hasNextLine()) fileScanner.nextLine();
+			
+			while(fileScanner.hasNextLine()) {
+				String line = fileScanner.nextLine();
+				String[] parts = line.split(",", -1);
+				if (parts.length >= 5) {
+					Task task = getTaskByName(uncleanCsv(parts[0]));
+					if (task != null) {
+						RecurrenceRule recurrenceRule = new RecurrenceRule(
+							uncleanCsv(parts[1]),
+							uncleanCsv(parts[2]),
+							task,
+							LocalDate.parse(parts[3]),
+							LocalDate.parse(parts[4])
+						);
+						recurrenceRules.add(recurrenceRule);
+					}
+				}
+			}
+			fileScanner.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not import recurrence rules");
+		}
+	}
+	
+	private void exportActivityEntries() {
+		try {
+			PrintWriter writer = new PrintWriter("data/activity_entries.csv");
+			writer.println("task,timestamp,description");
+			
+			for (ActivityEntry entry : activityEntryList.getActivityEntryList()) {
+				writer.println(
+					cleanCsv(entry.getTask().getTitle()) + "," +
+					entry.getTimestamp() + "," +
+					cleanCsv(entry.getDescription())
+				);
+			}
+			writer.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not export activity entries");
+		}
+	}
+
+	private void importActivityEntries() {
+		File file = new File("data/activity_entries.csv");
+		if (!file.exists()) return;
+		
+		try {
+			Scanner fileScanner = new Scanner(file);
+			if (fileScanner.hasNextLine()) fileScanner.nextLine();
+			
+			while(fileScanner.hasNextLine()) {
+				String line = fileScanner.nextLine();
+				String[] parts = line.split(",", -1);
+				if (parts.length >= 3) {
+					Task task = getTaskByName(uncleanCsv(parts[0]));
+					if (task != null) {
+						LocalDateTime timestamp = LocalDateTime.parse(parts[1]);
+						String description = uncleanCsv(parts[2]);
+						activityEntryList.createActivityEntry(task, description, timestamp);
+					}
+				}
+			}
+			fileScanner.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not import activity entries");
+		}
+	}
+	
+	public void exportSelectedTasks(ArrayList<Task> selectedTasks) {
+		try {
+			Files.createDirectories(Paths.get("data"));
+			PrintWriter writer = new PrintWriter("data/exported_tasks.csv");
+			writer.println("type,title,description,creation_date,due_date,priority,status,project,parent_task,collaborator,tags");
+			
+			for (Task task : selectedTasks) {
+				String type = "TASK";
+				String parentTask = "";
+				String collaborator = "";
+				
+				if (task instanceof CollaboratorTask) {
+					type = "COLLABORATORTASK";
+					parentTask = ((CollaboratorTask) task).getParentTask().getTitle();
+					collaborator = ((CollaboratorTask) task).getCollaborator().getName();
+				}
+				else if (task instanceof Subtask) {
+					type = "SUBTASK";
+					parentTask = ((Subtask) task).getParentTask().getTitle();
+				}
+				
+				String projectName = "";
+				if (task.getProject() != null) {
+					projectName = task.getProject().getName();
+				}
+				
+				String dueDate = "";
+				if (task.getDueDate() != null) {
+					dueDate = task.getDueDate().toString();
+				}
+				
+				writer.println(
+					type + "," +
+					cleanCsv(task.getTitle()) + "," +
+					cleanCsv(task.getDescription()) + "," +
+					task.getCreationDate() + "," +
+					dueDate + "," +
+					task.getPriority() + "," +
+					task.getStatus() + "," +
+					cleanCsv(projectName) + "," +
+					cleanCsv(parentTask) + "," +
+					cleanCsv(collaborator) + "," +
+					cleanCsv(tagsToString(task.getTags()))
+				);
+			}
+			
+			writer.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not export selected tasks");
+		}
+	}
+	
+	public void importTasksFromFile() {
+		File file = new File("data/import.csv");
+		if (!file.exists()) {
+			System.out.println("Could not find data/import.csv");
+			return;
+		}
+		
+		ArrayList<String> lines = new ArrayList<String>();
+		
+		try {
+			Scanner fileScanner = new Scanner(file);
+			if (fileScanner.hasNextLine()) fileScanner.nextLine();
+			
+			while(fileScanner.hasNextLine()) {
+				lines.add(fileScanner.nextLine());
+			}
+			fileScanner.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not read import file");
+			return;
+		}
+		
+		for (String line : lines) {
+			String[] parts = line.split(",", -1);
+			if (parts.length < 11) continue;
+			if (!parts[0].equals("TASK")) continue;
+			
+			String title = uncleanCsv(parts[1]);
+			if (getTaskByName(title) != null) {
+				System.out.println("Skipped task '" + title + "': task already exists");
+				continue;
+			}
+			
+			String description = uncleanCsv(parts[2]);
+			LocalDate creationDate = LocalDate.parse(parts[3]);
+			LocalDate dueDate = null;
+			if (!parts[4].equals("")) dueDate = LocalDate.parse(parts[4]);
+			Priority priority = parsePriority(parts[5]);
+			TaskStatus status = parseStatus(parts[6]);
+			String projectName = uncleanCsv(parts[7]);
+			ArrayList<Tag> tags = parseTagsCreatingMissing(uncleanCsv(parts[10]));
+			
+			Project project = null;
+			if (!projectName.equals("")) {
+				project = getProjectByName(projectName);
+				if (project == null) {
+					createProject(projectName, "");
+					project = getProjectByName(projectName);
+				}
+			}
+			
+			Task task = new Task(title, description, dueDate, priority);
+			task.setCreationDate(creationDate);
+			task.setStatus(status);
+			task.setProject(project);
+			task.setTags(tags);
+			taskList.addTask(task);
+		}
+		
+		for (String line : lines) {
+			String[] parts = line.split(",", -1);
+			if (parts.length < 11) continue;
+			if (!parts[0].equals("SUBTASK")) continue;
+			
+			String title = uncleanCsv(parts[1]);
+			if (getTaskByName(title) != null) {
+				System.out.println("Skipped task '" + title + "': task already exists");
+				continue;
+			}
+			
+			String description = uncleanCsv(parts[2]);
+			LocalDate creationDate = LocalDate.parse(parts[3]);
+			LocalDate dueDate = null;
+			if (!parts[4].equals("")) dueDate = LocalDate.parse(parts[4]);
+			Priority priority = parsePriority(parts[5]);
+			TaskStatus status = parseStatus(parts[6]);
+			String parentTaskName = uncleanCsv(parts[8]);
+			ArrayList<Tag> tags = parseTagsCreatingMissing(uncleanCsv(parts[10]));
+			
+			Task parentTask = getTaskByName(parentTaskName);
+			if (parentTask != null) {
+				taskList.createImportedSubtask(parentTask, title, description, creationDate, dueDate, priority, status, tags);
+			}
+		}
+		
+		for (String line : lines) {
+			String[] parts = line.split(",", -1);
+			if (parts.length < 11) continue;
+			if (!parts[0].equals("COLLABORATORTASK")) continue;
+			
+			String title = uncleanCsv(parts[1]);
+			if (getTaskByName(title) != null) {
+				System.out.println("Skipped task '" + title + "': task already exists");
+				continue;
+			}
+			
+			String description = uncleanCsv(parts[2]);
+			LocalDate creationDate = LocalDate.parse(parts[3]);
+			LocalDate dueDate = null;
+			if (!parts[4].equals("")) dueDate = LocalDate.parse(parts[4]);
+			Priority priority = parsePriority(parts[5]);
+			TaskStatus status = parseStatus(parts[6]);
+			String projectName = uncleanCsv(parts[7]);
+			String parentTaskName = uncleanCsv(parts[8]);
+			String collaboratorName = uncleanCsv(parts[9]);
+			ArrayList<Tag> tags = parseTagsCreatingMissing(uncleanCsv(parts[10]));
+			
+			Project project = null;
+			if (!projectName.equals("")) {
+				project = getProjectByName(projectName);
+				if (project == null) {
+					createProject(projectName, "");
+					project = getProjectByName(projectName);
+				}
+			}
+			
+			Task parentTask = getTaskByName(parentTaskName);
+			if (project != null && parentTask != null) {
+				Collaborator collaborator = getCollaboratorByName(project, collaboratorName);
+				if (collaborator == null) {
+					project.addCollaborator(new Collaborator(collaboratorName, Category.JUNIOR));
+					collaborator = getCollaboratorByName(project, collaboratorName);
+				}
+				
+				if (collaborator != null) {
+					taskList.createImportedCollaboratorTask(collaborator, parentTask, title, description, creationDate, dueDate, priority, status, tags);
+				}
+			}
+		}
+	}
+	
+	private ArrayList<Tag> parseTagsCreatingMissing(String tagString) {
+		ArrayList<Tag> output = new ArrayList<Tag>();
+		if (tagString == null || tagString.equals("")) return output;
+		
+		String[] splitTags = tagString.split("\\|");
+		for (int i = 0; i < splitTags.length; i++) {
+			String tagTitle = splitTags[i];
+			Tag tag = getTagByName(tagTitle);
+			if (tag == null) {
+				createTag(tagTitle);
+				tag = getTagByName(tagTitle);
+			}
+			if (tag != null) {
+				output.add(tag);
+			}
+		}
+		return output;
+	}
+	
+	public void exportSelectedTasksToIcs(ArrayList<Task> selectedTasks) {
+		try {
+			Files.createDirectories(Paths.get("data"));
+			PrintWriter writer = new PrintWriter("data/exported_tasks.ics");
+			
+			writer.println("BEGIN:VCALENDAR");
+			writer.println("VERSION:2.0");
+			writer.println("PRODID:-//TaskSystem//EN");
+			
+			for (Task task : selectedTasks) {
+				if (task instanceof Subtask) {
+					continue;
+				}
+				
+				if (task.getDueDate() == null) {
+					continue;
+				}
+				
+				String description = "";
+				
+				description += "Description: " + cleanIcs(task.getDescription());
+				description += "\\nStatus: " + task.getStatus();
+				description += "\\nPriority: " + task.getPriority();
+				description += "\\nDue date: " + task.getDueDate();
+				
+				if (task.getProject() != null) {
+					description += "\\nProject: " + cleanIcs(task.getProject().getName());
+				}
+				
+				ArrayList<Subtask> subtasks = getTaskSubtasks(task);
+				if (!subtasks.isEmpty()) {
+					description += "\\nSubtasks:";
+					for (int i = 0; i < subtasks.size(); i++) {
+						description += "\\n- " + cleanIcs(subtasks.get(i).getTitle()) + " (" + subtasks.get(i).getStatus() + ")";
+					}
+				}
+				
+				String dueDate = task.getDueDate().toString().replace("-", "");
+				
+				writer.println("BEGIN:VEVENT");
+				writer.println("UID:" + System.currentTimeMillis() + "_" + cleanIcs(task.getTitle()).replace(" ", "_") + "@tasksystem");
+				writer.println("DTSTAMP:" + LocalDateTime.now().toString().replace("-", "").replace(":", "").replace(".", "").substring(0, 15));
+				writer.println("DTSTART;VALUE=DATE:" + dueDate);
+				writer.println("DTEND;VALUE=DATE:" + task.getDueDate().plusDays(1).toString().replace("-", ""));
+				writer.println("SUMMARY:" + cleanIcs(task.getTitle()));
+				writer.println("DESCRIPTION:" + description);
+				writer.println("END:VEVENT");
+			}
+			
+			writer.println("END:VCALENDAR");
+			writer.close();
+		}
+		catch(Exception e) {
+			System.out.println("Could not export tasks to .ics");
+		}
+	}
+	
+	private String cleanIcs(String value) {
+		if (value == null) return "";
+		
+		String output = value;
+		output = output.replace("\\", "\\\\");
+		output = output.replace(",", "\\,");
+		output = output.replace(";", "\\;");
+		output = output.replace("\n", "\\n");
+		output = output.replace("\r", "");
+		
+		return output;
+	}
 	 
 }

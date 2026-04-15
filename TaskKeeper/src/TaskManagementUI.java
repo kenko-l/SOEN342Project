@@ -7,13 +7,21 @@ public class TaskManagementUI {
 	static Scanner sc = new Scanner(System.in);
 
 	public static void main(String[] args) {
+		taskSystem.importDatabase();
+		
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			public void run() {
+				taskSystem.exportDatabase();
+			}
+		});
+		
 		String UserInput;
 		while(true) {
 			displayMain();
 			while(true) {
 				System.out.print("Select an option:");
 				UserInput = sc.nextLine().trim();
-				if (UserInput.equals("1") || UserInput.equals("2") || UserInput.equals("3")) break;
+				if (UserInput.equals("1") || UserInput.equals("2") || UserInput.equals("3") || UserInput.equals("4")) break;
 				System.out.println("Invalid selection");
 			}
 			
@@ -25,9 +33,13 @@ public class TaskManagementUI {
 				handleTaskView();
 				break;
 			case "3":
-				//handleImportExport();
+				handleImportExport();
+				break;
+			case "4":
+				taskSystem.exportDatabase();
+				System.out.println("Database exported. Closing app.");
+				System.exit(0);
 			}
-				 
 		}
 	}
 	
@@ -35,6 +47,7 @@ public class TaskManagementUI {
 		System.out.println("1. Task Management");
 		System.out.println("2. Task View");
 		System.out.println("3. Import/Export");
+		System.out.println("4. Exit");
 	}
 	
 	//---------------------------------------------------------------------------
@@ -109,18 +122,6 @@ public class TaskManagementUI {
 			taskPriority = sc.nextLine().trim();
 			if (taskPriority.equals("1") || taskPriority.equals("2") || taskPriority.equals("3")) break;
 			else System.out.println("Invalid selection");
-		}
-		while(true) {
-			System.out.println("Enter task due date YYYY-MM-DD (Press enter to leave blank): ");
-			taskDueDate = sc.nextLine();
-			if (taskDueDate.equals("")) break;
-			try {
-				LocalDate.parse(taskDueDate);
-				break;
-			}
-			catch(Exception e) {
-				System.out.println("Invalid date format");
-			}
 		}
 		
 		if (taskType.equals("Task")) {
@@ -232,9 +233,22 @@ public class TaskManagementUI {
 						System.out.println("Invalid date format");
 					}
 				}
-				Task task = taskSystem.createDummyTask(taskName, taskDescription, taskPriority, taskDueDate);
+				Task task = taskSystem.createDummyTask(taskName, taskDescription, taskPriority, "");
 				taskSystem.createRecurrenceRule(task, recurrencePattern, recurrenceDay, recurrenceStartDate, recurrenceEndDate);
 				return;
+			}
+		}
+		
+		while(true) {
+			System.out.println("Enter task due date YYYY-MM-DD (Press enter to leave blank): ");
+			taskDueDate = sc.nextLine();
+			if (taskDueDate.equals("")) break;
+			try {
+				LocalDate.parse(taskDueDate);
+				break;
+			}
+			catch(Exception e) {
+				System.out.println("Invalid date format");
 			}
 		}
 		
@@ -672,7 +686,7 @@ public class TaskManagementUI {
 		System.out.println("Enter task name: ");
 		String taskName = sc.nextLine();
 		Task targetTask = taskSystem.getTaskByName(taskName);
-		if (taskName == null) {
+		if (targetTask == null) {
 			System.out.println("Can't find task with that name");
 			return;
 		}
@@ -698,13 +712,15 @@ public class TaskManagementUI {
 			System.out.println("1. View tasks");
 			System.out.println("2. Apply filter");
 			System.out.println("3. Apply sorting");
-			System.out.println("4. Go back");
+			System.out.println("4. Export displayed tasks to CSV");
+			System.out.println("5. Export displayed tasks to ICS");
+			System.out.println("6. Go back");
 			
 			String UserInput;
 			while(true) {
 				System.out.print("Select an option:");
 				UserInput = sc.nextLine().trim();
-				if (UserInput.equals("1") || UserInput.equals("2") || UserInput.equals("3") || UserInput.equals("4")) break;
+				if (UserInput.equals("1") || UserInput.equals("2") || UserInput.equals("3") || UserInput.equals("4") || UserInput.equals("5")  || UserInput.equals("6")) break;
 				System.out.println("Invalid selection");
 			}
 			
@@ -895,6 +911,63 @@ public class TaskManagementUI {
 				break;
 				
 			case "4":
+				ArrayList<Task> selectedTasksToExportCsv = taskSystem.getTasks(filterType, filterPackage, sortType, sortOrder);
+				taskSystem.exportSelectedTasks(selectedTasksToExportCsv);
+				System.out.println("Tasks exported successfully!");
+				break;
+
+			case "5":
+				ArrayList<Task> selectedTasksToExportIcs = taskSystem.getTasks(filterType, filterPackage, sortType, sortOrder);
+				taskSystem.exportSelectedTasksToIcs(selectedTasksToExportIcs);
+				System.out.println("Tasks exported to .ics successfully!");
+				break;
+
+			case "6":
+				return;
+		}
+		}
+	}
+	
+	private static void handleImportExport() {
+		while(true) {
+			System.out.println("1. Import tasks");
+			System.out.println("2. Export full database");
+			System.out.println("3. Go back");
+			
+			String userInput;
+			while(true) {
+				System.out.print("Select an option:");
+				userInput = sc.nextLine().trim();
+				if (userInput.equals("1") || userInput.equals("2") || userInput.equals("3")) break;
+				System.out.println("Invalid selection");
+			}
+			
+			switch(userInput) {
+			case "1":
+				System.out.println("Make sure you have a file called 'import.csv' in the data folder.");
+				System.out.println("1. Continue");
+				System.out.println("2. Cancel");
+				
+				String confirmInput;
+				while(true) {
+					System.out.print("Select an option:");
+					confirmInput = sc.nextLine().trim();
+					if (confirmInput.equals("1") || confirmInput.equals("2")) break;
+					System.out.println("Invalid selection");
+				}
+				
+				if (confirmInput.equals("1")) {
+					taskSystem.importTasksFromFile();
+					System.out.println("Task import complete!");
+				}
+				break;
+				
+			case "2":
+				taskSystem.exportDatabase();
+				System.out.println("Database exported successfully!");
+				break;
+				
+			case "3":
 				return;
 			}
 		}
