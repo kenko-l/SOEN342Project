@@ -18,7 +18,7 @@ IMPORTANT: The "data" folder must exist.
 
 2. Open Command Prompt in the project root folder and run:
 
-javac -d . src\*.java
+javac -d . src\\*.java
 
 3. Create the executable JAR:
 
